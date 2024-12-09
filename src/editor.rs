@@ -1,11 +1,8 @@
 use std::{cmp::min, io::Error};
 use crossterm::event::{ read, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers };
-use crate::terminal::{Position, Size};
+use crate::{terminal::{Position, Size}, view::View};
 
 use super::terminal::Terminal;
-
-static NAME: &str = env!("CARGO_PKG_NAME");
-static VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Default, Clone, Copy)]
 pub struct Location {
@@ -14,17 +11,12 @@ pub struct Location {
 }
 
 pub struct Editor {
-  quit: bool,
-  location: Location,
+  pub quit: bool,
+  pub location: Location,
+  pub view: View,
 }
 
 impl Editor {
-  pub fn new() -> Self {
-    Editor {
-      quit: false,
-      location: Location::default(),
-    }
-  }
 
   pub fn run(&mut self)  {
     Terminal::initialize().unwrap();
@@ -105,7 +97,7 @@ impl Editor {
       Terminal::clear_screen()?;
       print!("Goodbye.\r\n");
     } else {
-      Self::draw_rows()?;
+      self.view.render()?;
       Terminal::move_caret_to(&Position {
         col: self.location.x,
         row: self.location.y,
@@ -113,41 +105,6 @@ impl Editor {
     }
     Terminal::show_caret()?;
     Terminal::execute()?;
-    Ok(())
-  }
-
-  pub fn draw_rows() -> Result<(), Error> {
-    let Size {height, ..} = Terminal::size()?;
-    for current_row in 0..height {
-      Terminal::clear_line()?;
-      #[allow(clippy::integer_division)]
-      if current_row == height / 3 {
-        Self::draw_welcome_message()?;
-      } else {
-        Self::draw_empty_row()?;
-      }
-      if current_row.saturating_add(1) < height {
-        Terminal::print("\r\n")?;
-      }
-    }
-    Ok(())
-  }
-
-  pub fn draw_empty_row() -> Result<(), Error> {
-    Terminal::print("~")?;
-    Ok(())
-  }
-
-  pub fn draw_welcome_message() -> Result<(), Error> {
-    let mut message = format!("{NAME} editor -- version {VERSION}");
-    let width = Terminal::size()?.width;
-    let len = message.len();
-    #[allow(clippy::integer_division)]
-    let padding = width.saturating_sub(len) / 2;
-    let spaces = " ".repeat(padding.saturating_sub(1));
-    message = format!("~{spaces}{message}");
-    message.truncate(width);
-    Terminal::print(&message)?;
     Ok(())
   }
 }
