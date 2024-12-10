@@ -1,7 +1,7 @@
-use crossterm::{cursor::{Hide, MoveTo, Show}, queue, style::Print, terminal::{disable_raw_mode, enable_raw_mode, size, Clear, ClearType}, Command};
+use crossterm::{cursor::{Hide, MoveTo, Show}, queue, style::Print, terminal::{disable_raw_mode, enable_raw_mode, size, Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen}, Command};
 use std::io::{stdout, Error, Write};
 
-#[derive(Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone)]
 pub struct Size {
   pub width: usize,
   pub height: usize,
@@ -39,7 +39,9 @@ impl Terminal {
 
   pub fn initialize() -> Result<(), Error> {
     enable_raw_mode()?;
+    Self::enter_alternate_screen()?;
     Self::clear_screen()?;
+    Self::execute()?;
     Ok(())
 }
 
@@ -48,7 +50,10 @@ impl Terminal {
   }
 
   pub fn terminate() -> Result<(), Error> {
-    disable_raw_mode()
+    Self::leave_alternate_screen()?;
+    Self::show_caret()?;
+    disable_raw_mode()?;
+    Ok(())
   }
   pub fn move_caret_to(pos: &Position) -> Result<(), Error> {
     #[allow(clippy::as_conversions)]
@@ -70,6 +75,26 @@ impl Terminal {
 
   pub fn queue_comand<T: Command>(command: T) -> Result<(), Error> {
     queue!(stdout(), command)?;
+    Ok(())
+  }
+
+  pub fn print_row(at: usize, line_txt: &str) -> Result<(), Error> {
+    Terminal::move_caret_to(&Position {
+      col: 0,
+      row: at,
+    })?;
+    Terminal::clear_line()?;
+    Terminal::print(line_txt)?;
+    Ok(())
+  }
+
+  pub fn leave_alternate_screen() -> Result<(), Error> {
+    Self::queue_comand(LeaveAlternateScreen)?;
+    Ok(())
+  }
+
+  pub fn enter_alternate_screen() -> Result<(), Error> {
+    Self::queue_comand(EnterAlternateScreen)?;
     Ok(())
   }
 }
