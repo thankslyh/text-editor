@@ -1,16 +1,22 @@
-use crate::{buffer::Buffer, location::Location, editorcommand::{Direction, EditorCommand}, terminal::{Position, Size, Terminal}};
-
+use crate::{buffer::Buffer, editorcommand::{Direction, EditorCommand}, line::Line, terminal::{Position, Size, Terminal}};
+use std::cmp::min;
 static NAME: &str = env!("CARGO_PKG_NAME");
 static VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Default)]
+pub struct Location {
+  pub grapheme_index: usize,
+  pub line_index: usize,
+}
+
 pub struct View {
   buf: Buffer,
   size: Size,
   need_redraw: bool,
-  location: Location,
-  scroll_offset: Location,
+  text_location: Location,
+  scroll_offset: Position,
 }
+
 
 impl Default for View {
     fn default() -> Self {
@@ -18,8 +24,8 @@ impl Default for View {
           buf: Buffer::default(),
           size: Terminal::size().unwrap_or_default(),
           need_redraw: true,
-          location: Location::default(),
-          scroll_offset: Location::default(),
+          text_location: Location::default(),
+          scroll_offset: Position::default(),
         }
     }
 }
@@ -35,7 +41,7 @@ impl View {
 
     pub fn resize(&mut self, size: Size) {
       self.size = size;
-      self.scroll_location_into_view();
+      self.scroll_text_location_into_view();
       self.need_redraw = true;
     }
 
@@ -52,13 +58,13 @@ impl View {
       if width == 0 || height == 0 {
         return
       }
-      let top = self.scroll_offset.y;
+      let top = self.scroll_offset.row;
       #[allow(clippy::as_conversions)]
       let ver_center = height / 3;
       for current_row in 1..height {
         if let Some(line) = self.buf.lines.get(current_row.saturating_add(top)) {
-          let left = self.scroll_offset.x;
-          let right = self.scroll_offset.x.saturating_add(width);
+          let left = self.scroll_offset.col;
+          let right = self.scroll_offset.col.saturating_add(width);
           Self::render_line(current_row, &line.get(left..right));
         } else if current_row == ver_center && self.buf.is_empty() {
           Self::render_line(current_row, &Self::buid_welcome_message(width));
@@ -80,68 +86,113 @@ impl View {
           _ => {},
       }
     }
-    pub fn move_text_location(&mut self, d: Direction) {
-      let Location { mut x, mut y } = self.location;
-      let Size { width, height } = self.size;
-      match d {
-          Direction::Up => {
-            y = y.saturating_sub(1)
-          }
-          Direction::Down => {
-            y = y.saturating_add(1);
-          }
-          Direction::Left => {
-            x = x.saturating_sub(1)
-          }
-          Direction::Right => {
-            x = x.saturating_add(1);
-          }
-          Direction::PageDown => {
-            y = height.saturating_sub(1)
-          }
-          Direction::PageUp => {
-            y = 0
-          }
-          Direction::Home => {
-            x = 0;
-          }
-          Direction::End => {
-            x = width.saturating_sub(1);
-          }
-      }
-      self.location = Location {
-        x,
-        y
+
+    fn scroll_vertically(&mut self, to: usize) {
+      let height = self.size.height;
+      let changed = if to < self.scroll_offset.row {
+        self.scroll_offset.row = to;
+        true
+      } else if to >= self.scroll_offset.row.saturating_add(height) {
+        self.scroll_offset.row = to.saturating_sub(height).saturating_add(1);
+        true
+      } else {
+        false
       };
-      self.scroll_location_into_view();
+      self.need_redraw = self.need_redraw || changed
     }
 
-    pub fn get_position(&mut self) -> Position {
-      self.location.subtract(&self.scroll_offset).into()
+    fn scroll_heriztion(&mut self, to: usize) {
+      let width = self.size.width;
+      let changed = if to < self.scroll_offset.col {
+        self.scroll_offset.col = to;
+        true
+      } else if to >= self.scroll_offset.col.saturating_add(width) {
+        self.scroll_offset.col = to.saturating_sub(width).saturating_add(1);
+        true
+      } else {
+        false
+      };
+      self.need_redraw = self.need_redraw || changed
     }
 
-    pub fn scroll_location_into_view(&mut self) {
-      let Location { x, y } = self.location;
-      let Size { width, height } = self.size;
-      let mut offset_changed = false;
-
-      if x < self.scroll_offset.x {
-        self.scroll_offset.x = x;
-        offset_changed = true;
-      } else if x >= self.scroll_offset.x.saturating_add(width) {
-        self.scroll_offset.x = x.saturating_sub(width).saturating_add(1);
-        offset_changed = true;
+    pub fn text_location_to_postion(&self) -> Position {
+      let Location { line_index, grapheme_index } = self.text_location;
+      let col = self.buf.lines.get(line_index).map_or(0, |line| {
+        line.width_until(grapheme_index)
+      });
+      Position {
+        row: line_index,
+        col
       }
+    }
 
-      // Scroll vertically
-      if y < self.scroll_offset.y {
-        self.scroll_offset.y = y;
-        offset_changed = true;
-      } else if y >= self.scroll_offset.y.saturating_add(height) {
-        self.scroll_offset.y = y.saturating_sub(height).saturating_add(1);
-        offset_changed = true;
+    pub fn move_text_location(&mut self, d: Direction) {
+      let Size { height, .. } = self.size;
+      let _ = match d {
+          Direction::Up => self.move_up(1),
+          Direction::Down => self.move_down(1),
+          Direction::Left => self.move_left(),
+          Direction::Right => self.move_right(),
+          Direction::PageDown => self.move_down(height.saturating_sub(1)),
+          Direction::PageUp => self.move_up(height.saturating_sub(1)),
+          Direction::Home => self.move_start_of_line(),
+          Direction::End => self.move_end_of_line(),
+      };
+      self.scroll_text_location_into_view();
+    }
+
+    pub fn scroll_text_location_into_view(&mut self) {
+      let pos = self.text_location_to_postion();
+      self.scroll_heriztion(pos.col);
+      self.scroll_vertically(pos.row);
+    }
+
+    fn move_up(&mut self, step: usize) {
+      self.text_location.line_index = self.text_location.line_index.saturating_sub(step);
+      self.snap_to_valid_grapheme();
+    }
+
+    fn move_down(&mut self, step: usize) {
+      self.text_location.line_index = self.text_location.line_index.saturating_add(step);
+      self.snap_to_valid_grapheme();
+      self.snap_to_valid_line();
+    }
+
+    fn move_left(&mut self) {
+      if self.text_location.grapheme_index > 0 {
+        self.text_location.grapheme_index -= 1;
+      } else {
+        self.move_up(1);
+        self.move_end_of_line();
       }
-      self.need_redraw = offset_changed
+    }
+
+    fn move_right(&mut self) {
+      let width = self.buf.lines.get(self.text_location.line_index).map_or(0, Line::len);
+      if self.text_location.grapheme_index < width {
+        self.text_location.grapheme_index += 1;
+      } else {
+        self.move_start_of_line();
+        self.move_down(1)
+      }
+    }
+
+    fn move_start_of_line(&mut self) {
+      self.text_location.grapheme_index = 0;
+    }
+
+    fn move_end_of_line(&mut self) {
+      self.text_location.grapheme_index = self.buf.lines.get(self.text_location.line_index).map_or(0, Line::len);
+    }
+
+    fn snap_to_valid_grapheme(&mut self) {
+      self.text_location.grapheme_index = self.buf.lines.get(self.text_location.line_index).map_or(0, |line| {
+        min(self.text_location.grapheme_index, line.len())
+      });
+    }
+
+    fn snap_to_valid_line(&mut self) {
+      self.text_location.line_index = min(self.text_location.line_index, self.buf.height());
     }
 
     pub fn buid_welcome_message(width: usize) -> String {

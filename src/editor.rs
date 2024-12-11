@@ -1,6 +1,6 @@
-use std::{cmp::min, io::Error, panic::{set_hook, take_hook}};
-use crossterm::event::{ self, read, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers };
-use crate::{editorcommand::EditorCommand, terminal::{Position, Size}, view::View};
+use std::{io::Error, panic::{set_hook, take_hook}};
+use crossterm::event::{read, Event, KeyEvent, KeyEventKind };
+use crate::{editorcommand::EditorCommand, view::View};
 use super::terminal::Terminal;
 
 pub struct Editor {
@@ -84,7 +84,7 @@ impl Editor {
   fn refresh_screen(&mut self) {
     let _ = Terminal::hide_caret();
     self.view.render();
-    let _ = Terminal::move_caret_to(&self.view.get_position());
+    let _ = Terminal::move_caret_to(&self.view.text_location_to_postion());
     let _ = Terminal::show_caret();
     let _ = Terminal::execute();
   }

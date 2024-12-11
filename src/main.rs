@@ -3,7 +3,6 @@ mod terminal;
 mod view;
 mod buffer;
 mod editorcommand;
-mod location;
 mod line;
 
 fn main() {
