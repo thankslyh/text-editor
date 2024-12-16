@@ -56,7 +56,7 @@ impl Terminal {
     }
 
     pub fn print_inverted_row(row: usize, line_txt: &str) -> Result<(), Error> {
-        let width = Self::size().unwrap_or_default().width;
+        let width = Self::size()?.width;
         Self::print_row(
             row,
             &format!(

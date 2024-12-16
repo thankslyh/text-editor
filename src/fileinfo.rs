@@ -21,6 +21,6 @@ impl Display for FileInfo {
             .and_then(|p| p.file_name())
             .and_then(|p| p.to_str())
             .unwrap();
-        writeln!(f, "{name}")
+        write!(f, "{name}")
     }
 }
