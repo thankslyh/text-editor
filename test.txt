@@ -1,8 +1,8 @@
-# Testing regular text
-Hello, world! This is a test.
-# 1111Testing tabs
-Here	is	a	tab	separated	line.
-# Testing visible and invisible whitespace
+qqqq# Testing regular text
+Hellqqqqqqqqo, world! This is a test.
+1111# 1111Testing tabs
+Heresssssss	is	a	tab	separated	line.
+# T2221q11esting visible and invisible whitespace
 Non-breaking space and zero-width​space.
 # Testing control characters
 Control characters:[Escape][Bell]

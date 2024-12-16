@@ -1,13 +1,12 @@
 use crate::{
     buffer::Buffer,
-    editor::DocumentStatus,
+    documentstatus::DocumentStatus,
+    editor::{NAME, VERSION},
     editorcommand::{Direction, EditorCommand},
     line::Line,
     terminal::{Position, Size, Terminal},
 };
 use std::cmp::min;
-static NAME: &str = env!("CARGO_PKG_NAME");
-static VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Copy, Clone, Default)]
 pub struct Location {
@@ -19,6 +18,7 @@ pub struct View {
     buf: Buffer,
     size: Size,
     need_redraw: bool,
+    margin_bottom: usize,
     text_location: Location,
     scroll_offset: Position,
 }
@@ -29,6 +29,7 @@ impl Default for View {
             buf: Buffer::default(),
             size: Terminal::size().unwrap_or_default(),
             need_redraw: true,
+            margin_bottom: 0,
             text_location: Location::default(),
             scroll_offset: Position::default(),
         }
@@ -44,6 +45,7 @@ impl View {
                 width,
                 height: height.saturating_sub(margin_bottom),
             },
+            margin_bottom,
             need_redraw: true,
             text_location: Location::default(),
             scroll_offset: Position::default(),
@@ -55,7 +57,8 @@ impl View {
             current_line: self.text_location.line_index,
             total_line: self.buf.height(),
             is_modify: false,
-            filename: self.buf.filename.clone(),
+            filename: self.buf.file_info.to_string(),
+            is_modified: self.need_redraw,
         }
     }
     pub fn load(&mut self, filename: &str) {
@@ -66,7 +69,10 @@ impl View {
     }
 
     pub fn resize(&mut self, size: Size) {
-        self.size = size;
+        self.size = Size {
+            width: size.width,
+            height: size.height.saturating_sub(self.margin_bottom),
+        };
         self.scroll_text_location_into_view();
         self.need_redraw = true;
     }
@@ -77,7 +83,7 @@ impl View {
     }
 
     pub fn render(&mut self) {
-        if !self.need_redraw {
+        if !self.need_redraw || self.size.height == 0 {
             return;
         }
         let Size { width, height } = self.size;
@@ -286,20 +292,14 @@ impl View {
 
     pub fn buid_welcome_message(width: usize) -> String {
         if width == 0 {
-            return " ".to_string();
+            return String::new();
         }
         let welcome_message = format!("{NAME} editor -- version {VERSION}");
         let len = welcome_message.len();
-        if width <= len {
+        let remaining_width = width.saturating_sub(1);
+        if width < len {
             return "~".to_string();
         }
-        // we allow this since we don't care if our welcome message is put _exactly_ in the middle.
-        // it's allowed to be a bit to the left or right.
-        #[allow(clippy::integer_division)]
-        let padding = (width.saturating_sub(len).saturating_sub(1)) / 2;
-
-        let mut full_message = format!("~{}{}", " ".repeat(padding), welcome_message);
-        full_message.truncate(width);
-        full_message
+        format!("{:<1}{:^remaining_width$}", "~", welcome_message)
     }
 }

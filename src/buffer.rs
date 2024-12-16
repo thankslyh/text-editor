@@ -4,12 +4,12 @@ use std::{
     io::Write,
 };
 
-use crate::{line::Line, view::Location};
+use crate::{fileinfo::FileInfo, line::Line, view::Location};
 
 #[derive(Debug)]
 pub struct Buffer {
     pub lines: Vec<Line>,
-    pub filename: Option<String>,
+    pub file_info: FileInfo,
     pub is_modify: bool,
 }
 
@@ -17,7 +17,7 @@ impl Default for Buffer {
     fn default() -> Self {
         Buffer {
             lines: Vec::new(),
-            filename: None,
+            file_info: FileInfo { path: None },
             is_modify: false,
         }
     }
@@ -32,7 +32,7 @@ impl Buffer {
         }
         Ok(Self {
             lines,
-            filename: Some(filepath.to_string()),
+            file_info: FileInfo::from(filepath),
             is_modify: false,
         })
     }
@@ -80,8 +80,8 @@ impl Buffer {
     }
 
     pub fn save(&mut self) -> Result<(), Error> {
-        if let Some(filename) = &self.filename {
-            let mut file = File::create(filename)?;
+        if let Some(path) = &self.file_info.path {
+            let mut file = File::create(path)?;
             for line in &self.lines {
                 writeln!(file, "{line}")?;
             }

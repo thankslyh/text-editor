@@ -5,18 +5,14 @@ use std::{
     io::Error,
     panic::{set_hook, take_hook},
 };
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct DocumentStatus {
-    pub current_line: usize,
-    pub total_line: usize,
-    pub is_modify: bool,
-    pub filename: Option<String>,
-}
+pub const NAME: &str = env!("CARGO_PKG_NAME");
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub struct Editor {
     pub quit: bool,
     pub view: View,
     pub status_bar: Statusbar,
+    pub title: String,
 }
 
 impl Default for Editor {
@@ -24,6 +20,7 @@ impl Default for Editor {
         Self {
             quit: false,
             view: View::default(),
+            title: String::new(),
             status_bar: Statusbar::new(1),
         }
     }
@@ -36,16 +33,27 @@ impl Editor {
             default_hook(panic_info);
         }));
         Terminal::initialize()?;
-        let mut view = View::new(2);
+        let mut editor = Self {
+            quit: false,
+            view: View::new(2),
+            title: NAME.to_string(),
+            status_bar: Statusbar::new(1),
+        };
         let args: Vec<String> = std::env::args().collect();
         if let Some(file_name) = args.get(1) {
-            view.load(&file_name);
+            editor.view.load(&file_name);
         }
-        Ok(Self {
-            quit: false,
-            view,
-            status_bar: Statusbar::new(1),
-        })
+        editor.refresh_status();
+        Ok(editor)
+    }
+
+    pub fn refresh_status(&mut self) {
+        let status = self.view.get_status();
+        let title = format!("{} - {NAME}", status.filename);
+        self.status_bar.update_status(status);
+        if title != self.title && matches!(Terminal::set_title(&title), Ok(())) {
+            self.title = title
+        }
     }
 
     pub fn run(&mut self) {

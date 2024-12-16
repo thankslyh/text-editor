@@ -1,10 +1,10 @@
 use crossterm::{
     cursor::{Hide, MoveTo, Show},
     queue,
-    style::Print,
+    style::{Attribute, Print},
     terminal::{
-        disable_raw_mode, enable_raw_mode, size, Clear, ClearType, EnterAlternateScreen,
-        LeaveAlternateScreen,
+        disable_raw_mode, enable_raw_mode, size, Clear, ClearType, DisableLineWrap, EnableLineWrap,
+        EnterAlternateScreen, LeaveAlternateScreen, SetTitle,
     },
     Command,
 };
@@ -43,6 +43,31 @@ impl Terminal {
         Ok(())
     }
 
+    pub fn disable_line_warp() -> Result<(), Error> {
+        Self::queue_comand(DisableLineWrap)
+    }
+
+    pub fn enable_line_warp() -> Result<(), Error> {
+        Self::queue_comand(EnableLineWrap)
+    }
+
+    pub fn set_title(title: &str) -> Result<(), Error> {
+        Self::queue_comand(SetTitle(title))
+    }
+
+    pub fn print_inverted_row(row: usize, line_txt: &str) -> Result<(), Error> {
+        let width = Self::size().unwrap_or_default().width;
+        Self::print_row(
+            row,
+            &format!(
+                "{}{:width$.width$}{}",
+                Attribute::Reverse,
+                line_txt,
+                Attribute::Reset
+            ),
+        )
+    }
+
     pub fn hide_caret() -> Result<(), Error> {
         Self::queue_comand(Hide)
     }
@@ -58,6 +83,7 @@ impl Terminal {
     pub fn initialize() -> Result<(), Error> {
         enable_raw_mode()?;
         Self::enter_alternate_screen()?;
+        Self::enable_line_warp()?;
         Self::clear_screen()?;
         Self::execute()?;
         Ok(())
@@ -69,6 +95,7 @@ impl Terminal {
 
     pub fn terminate() -> Result<(), Error> {
         Self::leave_alternate_screen()?;
+        Self::disable_line_warp()?;
         Self::show_caret()?;
         disable_raw_mode()?;
         Ok(())
