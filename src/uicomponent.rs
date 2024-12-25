@@ -1,4 +1,4 @@
-use crate::terminal::Size;
+use crate::size::Size;
 
 pub trait UIComponent {
     fn set_size(&mut self, size: Size);

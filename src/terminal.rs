@@ -1,3 +1,4 @@
+use crate::{position::Position, size::Size};
 use crossterm::{
     cursor::{Hide, MoveTo, Show},
     queue,
@@ -8,28 +9,8 @@ use crossterm::{
     },
     Command,
 };
+
 use std::io::{stdout, Error, Write};
-
-#[derive(Default, Debug, Copy, Clone)]
-pub struct Size {
-    pub width: usize,
-    pub height: usize,
-}
-
-#[derive(Default, Copy, Clone)]
-pub struct Position {
-    pub col: usize,
-    pub row: usize,
-}
-
-impl Position {
-    pub const fn saturating_sub(self, other: Self) -> Self {
-        Self {
-            col: self.col.saturating_sub(other.col),
-            row: self.row.saturating_sub(other.row),
-        }
-    }
-}
 
 pub struct Terminal;
 

@@ -1,10 +1,12 @@
 use crate::{
     buffer::Buffer,
+    command::{Edit, Move},
     documentstatus::DocumentStatus,
     editor::{NAME, VERSION},
-    editorcommand::{Direction, EditorCommand},
     line::Line,
-    terminal::{Position, Size, Terminal},
+    position::Position,
+    size::Size,
+    terminal::Terminal,
     uicomponent::UIComponent,
 };
 use std::{cmp::min, io::Error};
@@ -29,42 +31,31 @@ impl View {
         DocumentStatus {
             current_line: self.text_location.line_index,
             total_line: self.buf.height(),
-            is_modify: false,
             filename: self.buf.file_info.to_string(),
-            is_modified: self.needs_redraw(),
+            is_modified: self.buf.is_modify,
         }
     }
-    pub fn load(&mut self, filename: &str) {
-        if let Ok(buf) = Buffer::read_file(filename) {
-            self.buf = buf;
-            self.mark_redraw(true);
-        }
+    pub fn load(&mut self, filename: &str) -> Result<(), Error> {
+        let buf = Buffer::read_file(filename)?;
+        self.buf = buf;
+        self.mark_redraw(true);
+        Ok(())
+    }
+
+    pub fn is_file_loaded(&self) -> bool {
+        self.buf.is_file_loaded()
     }
 
     pub fn render_line(at: usize, line: &str) -> Result<(), Error> {
         Terminal::print_row(at, line)
     }
 
-    pub fn handler_command(&mut self, command: EditorCommand) {
-        match command {
-            EditorCommand::Move(d) => self.move_text_location(d),
-            EditorCommand::Resize(_) | EditorCommand::Quit => {}
-            EditorCommand::Insert(c) => {
-                self.insert_char(c);
-            }
-            EditorCommand::Backspace => {
-                self.backspace();
-            }
-            EditorCommand::Delete => {
-                self.delete_backward();
-            }
-            EditorCommand::Enter => {
-                self.insert_new_line();
-            }
-            EditorCommand::Save => {
-                self.save();
-            }
-            _ => {}
+    pub fn handler_edit(&mut self, edit: Edit) {
+        match edit {
+            Edit::Delete => self.delete_backward(),
+            Edit::Insert(c) => self.insert_char(c),
+            Edit::InsertNewline => self.insert_new_line(),
+            Edit::DeleteBackward => self.backspace(),
         }
     }
 
@@ -82,7 +73,7 @@ impl View {
 
     pub fn insert_new_line(&mut self) {
         self.buf.insert_new_line(self.text_location);
-        self.move_text_location(Direction::Right);
+        self.move_text_location(Move::Right);
         self.mark_redraw(true);
     }
 
@@ -111,7 +102,7 @@ impl View {
             false
         };
         if changed {
-            self.mark_redraw(changed);
+            self.mark_redraw(true);
         }
     }
 
@@ -127,7 +118,7 @@ impl View {
             false
         };
         if changed {
-            self.mark_redraw(changed);
+            self.mark_redraw(true);
         }
     }
 
@@ -147,17 +138,17 @@ impl View {
         }
     }
 
-    pub fn move_text_location(&mut self, d: Direction) {
+    pub fn move_text_location(&mut self, mv: Move) {
         let Size { height, .. } = self.size;
-        let _ = match d {
-            Direction::Up => self.move_up(1),
-            Direction::Down => self.move_down(1),
-            Direction::Left => self.move_left(),
-            Direction::Right => self.move_right(),
-            Direction::PageDown => self.move_down(height.saturating_sub(1)),
-            Direction::PageUp => self.move_up(height.saturating_sub(1)),
-            Direction::Home => self.move_start_of_line(),
-            Direction::End => self.move_end_of_line(),
+        let _ = match mv {
+            Move::Up => self.move_up(1),
+            Move::Down => self.move_down(1),
+            Move::Left => self.move_left(),
+            Move::Right => self.move_right(),
+            Move::PageDown => self.move_down(height.saturating_sub(1)),
+            Move::PageUp => self.move_up(height.saturating_sub(1)),
+            Move::Home => self.move_start_of_line(),
+            Move::End => self.move_end_of_line(),
         };
         self.scroll_text_location_into_view();
     }
@@ -226,8 +217,12 @@ impl View {
         self.text_location.line_index = min(self.text_location.line_index, self.buf.height());
     }
 
-    fn save(&mut self) {
-        let _ = self.buf.save();
+    pub fn save(&mut self) -> Result<(), Error> {
+        self.buf.save()
+    }
+
+    pub fn save_as(&mut self, filename: &str) -> Result<(), Error> {
+        self.buf.save_as(filename)
     }
 
     pub fn buid_welcome_message(width: usize) -> String {

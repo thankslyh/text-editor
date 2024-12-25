@@ -1,7 +1,5 @@
 use crate::{
-    documentstatus::DocumentStatus,
-    terminal::{Size, Terminal},
-    uicomponent::UIComponent,
+    documentstatus::DocumentStatus, size::Size, terminal::Terminal, uicomponent::UIComponent,
 };
 
 #[derive(Default)]

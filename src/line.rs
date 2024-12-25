@@ -107,6 +107,10 @@ impl Line {
         }
     }
 
+    pub fn width(&self) -> usize {
+        self.width_until(self.len())
+    }
+
     pub fn width_until(&self, index: usize) -> usize {
         self.fragments
             .iter()
@@ -132,6 +136,10 @@ impl Line {
         self.fragments = Self::str_to_fragments(&result);
     }
 
+    pub fn append_char(&mut self, s: char) {
+        self.intert_char(s, self.len());
+    }
+
     pub fn delete(&mut self, idx: usize) {
         let mut result = String::new();
         for (i, str) in self.fragments.iter().enumerate() {
@@ -140,6 +148,10 @@ impl Line {
             }
         }
         self.fragments = Self::str_to_fragments(&result);
+    }
+
+    pub fn delete_last(&mut self) {
+        self.delete(self.len().saturating_sub(1));
     }
 
     pub fn append(&mut self, other: &Self) {

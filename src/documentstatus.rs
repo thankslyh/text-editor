@@ -2,7 +2,6 @@
 pub struct DocumentStatus {
     pub current_line: usize,
     pub total_line: usize,
-    pub is_modify: bool,
     pub filename: String,
     pub is_modified: bool,
 }
